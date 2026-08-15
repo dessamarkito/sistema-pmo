@@ -1,4 +1,5 @@
 import streamlit as st
+import base64, os
 from database import (init_db, autenticar, listar_projetos, buscar_projeto,
                       salvar_projeto, excluir_projeto, areas_distintas,
                       pmos_distintos, trocar_senha,
@@ -6,6 +7,13 @@ from database import (init_db, autenticar, listar_projetos, buscar_projeto,
                       baixar_documento, excluir_documento,
                       listar_tarefas, salvar_tarefa, buscar_tarefa,
                       excluir_tarefa, metricas_tarefas)
+
+def _logo_b64():
+    _path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Cateno.png")
+    with open(_path, "rb") as f:
+        return "data:image/png;base64," + base64.b64encode(f.read()).decode()
+
+LOGO_SRC = _logo_b64()
 
 st.set_page_config(
     page_title="Sistema PMO | Cateno",
@@ -94,12 +102,12 @@ if not st.session_state.usuario:
     st.markdown("<br><br>", unsafe_allow_html=True)
     col_center = st.columns([1,1.2,1])[1]
     with col_center:
-        st.markdown("""
+        st.markdown(f"""
         <div style='text-align:center; padding:40px 30px; background:#FFFFFF;
                     border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.10);'>
-          <div style='background:linear-gradient(135deg,#002B5C,#0056A2);
-                      border-radius:8px; padding:12px 28px; display:inline-block; margin-bottom:16px;'>
-            <span style='font-size:1.8rem; font-weight:800; color:#FFF; letter-spacing:3px;'>CATENO</span>
+          <div style='background:#111827; border-radius:10px; padding:16px 28px;
+                      display:inline-block; margin-bottom:16px;'>
+            <img src='{LOGO_SRC}' style='height:52px; display:block;'>
           </div>
           <div style='font-size:1.3rem; font-weight:700; color:#111827; margin:8px 0'>Sistema PMO</div>
           <div style='color:#6B7280; font-size:0.9rem'>Controle de Projetos e Documentações</div>
@@ -125,12 +133,13 @@ if not st.session_state.usuario:
 # SIDEBAR
 # ════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("""
-    <div style='background:linear-gradient(135deg,#002B5C,#0056A2);
-                border-radius:10px; padding:12px 16px; margin-bottom:16px; text-align:center;'>
-      <span style='font-size:1.4rem; font-weight:800; color:#FFF; letter-spacing:3px;'>CATENO</span><br>
-      <span style='font-size:0.7rem; color:#AAD4FF; letter-spacing:1px;'>SISTEMA PMO</span>
+    st.markdown(f"""
+    <div style='background:#111827; border-radius:10px; padding:12px 16px;
+                margin-bottom:4px; text-align:center;'>
+      <img src='{LOGO_SRC}' style='height:44px; display:inline-block;'>
     </div>
+    <div style='text-align:center; font-size:0.7rem; color:#6B7280;
+                letter-spacing:1px; margin-bottom:14px;'>SISTEMA PMO</div>
     """, unsafe_allow_html=True)
 
     st.markdown(f"""
