@@ -2,7 +2,10 @@ import sqlite3
 import hashlib
 import os
 
-DB_PATH = "pmo.db"
+# Garante que o banco persiste mesmo no Streamlit Cloud
+DB_DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+os.makedirs(DB_DIR, exist_ok=True)
+DB_PATH = os.path.join(DB_DIR, "pmo.db")
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
