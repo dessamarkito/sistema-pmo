@@ -1,7 +1,9 @@
 import streamlit as st
 from database import (init_db, autenticar, listar_projetos, buscar_projeto,
                       salvar_projeto, excluir_projeto, areas_distintas,
-                      pmos_distintos, trocar_senha)
+                      pmos_distintos, trocar_senha,
+                      salvar_documento, listar_documentos,
+                      baixar_documento, excluir_documento)
 
 st.set_page_config(
     page_title="Sistema PMO | Cateno",
@@ -52,9 +54,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-STATUS_OPTS = ["🔵 Não Iniciado","🟢 No Prazo","🟡 Atenção","🔴 Crítico","⚫ Encerrado"]
+STATUS_OPTS    = ["🔵 Não Iniciado","🟢 No Prazo","🟡 Atenção","🔴 Crítico","⚫ Encerrado"]
 PRIORIDADE_OPTS = ["Alta","Média","Baixa"]
-FASE_OPTS = ["Iniciação","Planejamento","Execução","Monitoramento","Encerramento"]
+FASE_OPTS      = ["Iniciação","Planejamento","Execução","Monitoramento","Encerramento"]
+CATEGORIA_OPTS = ["Estratégicos","Regulatórios","Operacionais","Melhorias"]
 
 CARD_CLASS = {
     "🟢 No Prazo":    "card-verde",
@@ -195,6 +198,7 @@ if pagina == "🏠 Painel":
                 PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
                 {p['status']} &nbsp;|&nbsp;
                 Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
+                Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
                 Orç. Consumido: <b>{pct:.0f}%</b> &nbsp;|&nbsp;
                 Forecast: {p['forecast_prazo'] or '—'}
               </span>
@@ -241,6 +245,7 @@ elif pagina == "📋 Projetos":
                   <span style='color:#CCC; font-size:0.85rem'>
                     {p['status']} &nbsp;|&nbsp; PMO: {p['pmo_responsavel'] or '—'} &nbsp;|&nbsp;
                     Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
+                    Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
                     Prazo: {p['fim_previsto'] or '—'} → {p['forecast_prazo'] or '—'} &nbsp;|&nbsp;
                     Replanej.: {p['qtd_replanejamentos']}
                   </span>
@@ -299,7 +304,7 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
         descricao = st.text_area("Descrição do Projeto", value=p.get("descricao",""), height=100)
 
         st.markdown("#### Status e Classificação")
-        c5, c6, c7 = st.columns(3)
+        c5, c6, c7, c8 = st.columns(4)
         with c5:
             status = st.selectbox("Status *", STATUS_OPTS,
                                   index=STATUS_OPTS.index(p["status"]) if p.get("status") in STATUS_OPTS else 0)
@@ -309,6 +314,10 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
         with c7:
             fase = st.selectbox("Fase Atual", FASE_OPTS,
                                 index=FASE_OPTS.index(p["fase"]) if p.get("fase") in FASE_OPTS else 0)
+        with c8:
+            _cat_default = p.get("categoria","Operacionais") or "Operacionais"
+            categoria = st.selectbox("Categoria", CATEGORIA_OPTS,
+                                     index=CATEGORIA_OPTS.index(_cat_default) if _cat_default in CATEGORIA_OPTS else 2)
 
         st.markdown("#### Cronograma")
         d1, d2, d3 = st.columns(3)
@@ -354,7 +363,8 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
             else:
                 dados = {
                     "id": editar_id,
-                    "nome": nome, "area_demandante": area,
+                    "nome": nome, "categoria": categoria,
+                    "area_demandante": area,
                     "pmo_responsavel": pmo, "envolvidos": envolvidos,
                     "descricao": descricao, "status": status,
                     "prioridade": prioridade, "fase": fase,
@@ -367,14 +377,69 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
                     "motivo_replanejamento": motivo,
                     "observacoes": observacoes,
                 }
-                salvar_projeto(dados, st.session_state.usuario["nome"])
-                st.session_state.pop("editar_id", None)
+                novo_id = salvar_projeto(dados, st.session_state.usuario["nome"])
+                if not editar_id and novo_id:
+                    st.session_state["editar_id"] = novo_id
+                else:
+                    st.session_state.pop("editar_id", None)
                 st.success("✅ Projeto salvo com sucesso!")
                 st.rerun()
 
         if cancelar:
             st.session_state.pop("editar_id", None)
             st.rerun()
+
+    # ── Seção de Documentos (somente ao editar projeto existente) ─────
+    if editar_id:
+        st.markdown("<hr style='border-color:#333; margin:24px 0'>", unsafe_allow_html=True)
+        st.markdown("#### 📎 Documentos do Projeto")
+
+        docs = listar_documentos(editar_id)
+
+        if docs:
+            for doc in docs:
+                col_nome, col_env, col_dl, col_del = st.columns([4, 3, 1, 1])
+                with col_nome:
+                    st.markdown(f"📄 **{doc['nome_arquivo']}**")
+                with col_env:
+                    st.markdown(f"<span style='color:#AAA;font-size:0.82rem'>"
+                                f"Enviado por {doc['enviado_por']} em {doc['enviado_em'][:10]}"
+                                f"</span>", unsafe_allow_html=True)
+                with col_dl:
+                    raw = baixar_documento(doc["id"])
+                    if raw:
+                        st.download_button(
+                            "⬇️",
+                            data=raw["conteudo"],
+                            file_name=raw["nome_arquivo"],
+                            mime=raw["tipo_arquivo"] or "application/octet-stream",
+                            key=f"dl_{doc['id']}",
+                        )
+                with col_del:
+                    if st.button("🗑️", key=f"deldoc_{doc['id']}"):
+                        excluir_documento(doc["id"])
+                        st.rerun()
+        else:
+            st.markdown("<span style='color:#777;font-size:0.88rem'>Nenhum documento anexado ainda.</span>",
+                        unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        arquivo = st.file_uploader(
+            "Anexar novo documento",
+            accept_multiple_files=False,
+            key="uploader_doc",
+        )
+        if arquivo is not None:
+            if st.button("📤 Enviar arquivo", type="primary"):
+                salvar_documento(
+                    projeto_id=editar_id,
+                    nome_arquivo=arquivo.name,
+                    tipo_arquivo=arquivo.type,
+                    conteudo=arquivo.read(),
+                    enviado_por=st.session_state.usuario["nome"],
+                )
+                st.success(f"✅ **{arquivo.name}** enviado com sucesso!")
+                st.rerun()
 
 # ════════════════════════════════════════════════════════════════════
 # TROCAR SENHA

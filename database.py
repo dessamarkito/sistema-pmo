@@ -34,6 +34,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo TEXT UNIQUE NOT NULL,
             nome TEXT NOT NULL,
+            categoria TEXT DEFAULT 'Operacionais',
             area_demandante TEXT,
             pmo_responsavel TEXT,
             envolvidos TEXT,
@@ -56,6 +57,19 @@ def init_db():
         )
     """)
 
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS documentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL,
+            nome_arquivo TEXT NOT NULL,
+            tipo_arquivo TEXT,
+            conteudo BLOB NOT NULL,
+            enviado_por TEXT,
+            enviado_em TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id)
+        )
+    """)
+
     # Usuários iniciais
     usuarios_iniciais = [
         ("Andressa Marquito", "andressa@pmo.com", "pmo@2025"),
@@ -67,6 +81,13 @@ def init_db():
     for nome, email, senha in usuarios_iniciais:
         c.execute("INSERT OR IGNORE INTO usuarios (nome, email, senha_hash) VALUES (?,?,?)",
                   (nome, email, hash_senha(senha)))
+
+    # Migração: adiciona coluna categoria se não existir
+    try:
+        c.execute("ALTER TABLE projetos ADD COLUMN categoria TEXT DEFAULT 'Operacionais'")
+        conn.commit()
+    except Exception:
+        pass
 
     conn.commit()
     conn.close()
@@ -122,7 +143,7 @@ def salvar_projeto(dados, usuario):
     if dados.get("id"):
         c.execute("""
             UPDATE projetos SET
-                nome=?, area_demandante=?, pmo_responsavel=?, envolvidos=?,
+                nome=?, categoria=?, area_demandante=?, pmo_responsavel=?, envolvidos=?,
                 descricao=?, status=?, prioridade=?, fase=?,
                 inicio_previsto=?, fim_previsto=?, forecast_prazo=?,
                 orcamento_aprovado=?, orcamento_consumido=?, forecast_custo=?,
@@ -130,7 +151,7 @@ def salvar_projeto(dados, usuario):
                 atualizado_em=datetime('now')
             WHERE id=?
         """, (
-            dados["nome"], dados["area_demandante"], dados["pmo_responsavel"],
+            dados["nome"], dados["categoria"], dados["area_demandante"], dados["pmo_responsavel"],
             dados["envolvidos"], dados["descricao"], dados["status"],
             dados["prioridade"], dados["fase"], dados["inicio_previsto"],
             dados["fim_previsto"], dados["forecast_prazo"],
@@ -142,14 +163,14 @@ def salvar_projeto(dados, usuario):
         codigo = proximo_codigo()
         c.execute("""
             INSERT INTO projetos (
-                codigo, nome, area_demandante, pmo_responsavel, envolvidos,
+                codigo, nome, categoria, area_demandante, pmo_responsavel, envolvidos,
                 descricao, status, prioridade, fase,
                 inicio_previsto, fim_previsto, forecast_prazo,
                 orcamento_aprovado, orcamento_consumido, forecast_custo,
                 qtd_replanejamentos, motivo_replanejamento, observacoes, criado_por
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
-            codigo, dados["nome"], dados["area_demandante"], dados["pmo_responsavel"],
+            codigo, dados["nome"], dados["categoria"], dados["area_demandante"], dados["pmo_responsavel"],
             dados["envolvidos"], dados["descricao"], dados["status"],
             dados["prioridade"], dados["fase"], dados["inicio_previsto"],
             dados["fim_previsto"], dados["forecast_prazo"],
@@ -157,6 +178,44 @@ def salvar_projeto(dados, usuario):
             dados["forecast_custo"], dados["qtd_replanejamentos"],
             dados["motivo_replanejamento"], dados["observacoes"], usuario
         ))
+    new_id = c.lastrowid if not dados.get("id") else None
+    conn.commit()
+    conn.close()
+    return new_id
+
+def salvar_documento(projeto_id, nome_arquivo, tipo_arquivo, conteudo, enviado_por):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO documentos (projeto_id, nome_arquivo, tipo_arquivo, conteudo, enviado_por)
+        VALUES (?,?,?,?,?)
+    """, (projeto_id, nome_arquivo, tipo_arquivo, conteudo, enviado_por))
+    conn.commit()
+    conn.close()
+
+def listar_documentos(projeto_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        SELECT id, nome_arquivo, tipo_arquivo, enviado_por, enviado_em
+        FROM documentos WHERE projeto_id=? ORDER BY enviado_em DESC
+    """, (projeto_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def baixar_documento(doc_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT nome_arquivo, tipo_arquivo, conteudo FROM documentos WHERE id=?", (doc_id,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def excluir_documento(doc_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM documentos WHERE id=?", (doc_id,))
     conn.commit()
     conn.close()
 
