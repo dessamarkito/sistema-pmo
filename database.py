@@ -167,6 +167,23 @@ def excluir_projeto(projeto_id):
     conn.commit()
     conn.close()
 
+def trocar_senha(usuario_id, senha_atual, nova_senha):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT senha_hash FROM usuarios WHERE id=?", (usuario_id,))
+    row = c.fetchone()
+    if not row or row["senha_hash"] != hash_senha(senha_atual):
+        conn.close()
+        return False, "Senha atual incorreta."
+    if len(nova_senha) < 6:
+        conn.close()
+        return False, "A nova senha deve ter pelo menos 6 caracteres."
+    c.execute("UPDATE usuarios SET senha_hash=? WHERE id=?",
+              (hash_senha(nova_senha), usuario_id))
+    conn.commit()
+    conn.close()
+    return True, "Senha alterada com sucesso!"
+
 def areas_distintas():
     conn = get_conn()
     c = conn.cursor()

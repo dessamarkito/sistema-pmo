@@ -1,9 +1,10 @@
 import streamlit as st
 from database import (init_db, autenticar, listar_projetos, buscar_projeto,
-                      salvar_projeto, excluir_projeto, areas_distintas, pmos_distintos)
+                      salvar_projeto, excluir_projeto, areas_distintas,
+                      pmos_distintos, trocar_senha)
 
 st.set_page_config(
-    page_title="Sistema PMO",
+    page_title="Sistema PMO | Cateno",
     page_icon="📋",
     layout="wide",
 )
@@ -14,7 +15,7 @@ init_db()
 st.markdown("""
 <style>
   .main { background:#0E1117; }
-  .block-container { padding-top:1.5rem; }
+  .block-container { padding-top:1rem; }
   .titulo-sistema {
     font-size:1.6rem; font-weight:700; color:#FFFFFF;
     border-left:5px solid #009A44; padding-left:12px; margin-bottom:4px;
@@ -37,6 +38,17 @@ st.markdown("""
   .kpi-val { font-size:1.8rem; font-weight:700; }
   .kpi-lbl { font-size:0.78rem; color:#AAAAAA; }
   .divider { border-top:1px solid #333; margin:16px 0; }
+  .logo-cateno {
+    background: linear-gradient(135deg, #002B5C 0%, #0056A2 100%);
+    border-radius:10px; padding:10px 20px;
+    display:flex; align-items:center; gap:12px; margin-bottom:16px;
+  }
+  .logo-texto {
+    font-size:1.6rem; font-weight:800; color:#FFFFFF; letter-spacing:2px;
+  }
+  .logo-sub {
+    font-size:0.75rem; color:#AAD4FF; letter-spacing:1px;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,8 +77,11 @@ if not st.session_state.usuario:
         st.markdown("""
         <div style='text-align:center; padding:40px 30px; background:#1C2333;
                     border-radius:16px; border:1px solid #333;'>
-          <div style='font-size:2.5rem'>📋</div>
-          <div style='font-size:1.5rem; font-weight:700; color:#FFF; margin:8px 0'>Sistema PMO</div>
+          <div style='background:linear-gradient(135deg,#002B5C,#0056A2);
+                      border-radius:8px; padding:12px 24px; display:inline-block; margin-bottom:16px;'>
+            <span style='font-size:1.8rem; font-weight:800; color:#FFF; letter-spacing:3px;'>CATENO</span>
+          </div>
+          <div style='font-size:1.3rem; font-weight:700; color:#FFF; margin:8px 0'>Sistema PMO</div>
           <div style='color:#AAA; font-size:0.9rem'>Controle de Projetos e Documentações</div>
         </div>
         """, unsafe_allow_html=True)
@@ -90,15 +105,23 @@ if not st.session_state.usuario:
 # SIDEBAR
 # ════════════════════════════════════════════════════════════════════
 with st.sidebar:
+    st.markdown("""
+    <div style='background:linear-gradient(135deg,#002B5C,#0056A2);
+                border-radius:10px; padding:12px 16px; margin-bottom:16px; text-align:center;'>
+      <span style='font-size:1.4rem; font-weight:800; color:#FFF; letter-spacing:3px;'>CATENO</span><br>
+      <span style='font-size:0.7rem; color:#AAD4FF; letter-spacing:1px;'>SISTEMA PMO</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown(f"""
     <div style='background:#1C2333; border-radius:10px; padding:14px; margin-bottom:16px;'>
-      <div style='font-size:0.8rem; color:#AAA'>Logado como</div>
+      <div style='font-size:0.78rem; color:#AAA'>Logado como</div>
       <div style='font-weight:700; color:#FFF'>{st.session_state.usuario['nome']}</div>
       <div style='font-size:0.78rem; color:#009A44'>{st.session_state.usuario['email']}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    pagina = st.radio("Menu", ["🏠 Painel", "📋 Projetos", "➕ Novo Projeto"],
+    pagina = st.radio("Menu", ["🏠 Painel", "📋 Projetos", "➕ Novo Projeto", "🔑 Trocar Senha"],
                       label_visibility="collapsed")
 
     st.markdown("<hr style='border-color:#333'>", unsafe_allow_html=True)
@@ -352,3 +375,47 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
         if cancelar:
             st.session_state.pop("editar_id", None)
             st.rerun()
+
+# ════════════════════════════════════════════════════════════════════
+# TROCAR SENHA
+# ════════════════════════════════════════════════════════════════════
+elif pagina == "🔑 Trocar Senha":
+    st.markdown('<div class="titulo-sistema">Trocar Senha</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitulo">Altere sua senha de acesso ao sistema</div>',
+                unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col = st.columns([1, 1.2, 1])[1]
+    with col:
+        with st.form("form_senha"):
+            st.markdown(f"""
+            <div style='background:#1C2333; border-radius:10px; padding:16px;
+                        margin-bottom:16px; text-align:center;'>
+              <div style='color:#AAA; font-size:0.85rem;'>Alterando senha para</div>
+              <div style='color:#FFF; font-weight:700;'>{st.session_state.usuario['nome']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            senha_atual  = st.text_input("Senha atual", type="password")
+            nova_senha   = st.text_input("Nova senha", type="password",
+                                         help="Mínimo 6 caracteres")
+            conf_senha   = st.text_input("Confirmar nova senha", type="password")
+
+            salvar_senha = st.form_submit_button("🔑 Alterar Senha",
+                                                  type="primary",
+                                                  use_container_width=True)
+            if salvar_senha:
+                if not senha_atual or not nova_senha or not conf_senha:
+                    st.error("Preencha todos os campos.")
+                elif nova_senha != conf_senha:
+                    st.error("A nova senha e a confirmação não coincidem.")
+                else:
+                    ok, msg = trocar_senha(
+                        st.session_state.usuario["id"], senha_atual, nova_senha
+                    )
+                    if ok:
+                        st.success(f"✅ {msg} Faça login novamente.")
+                        st.session_state.usuario = None
+                        st.rerun()
+                    else:
+                        st.error(msg)
