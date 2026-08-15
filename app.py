@@ -157,6 +157,7 @@ with st.sidebar:
     if st.button("Sair", use_container_width=True):
         st.session_state.usuario = None
         st.session_state.pop("editar_id", None)
+        st.session_state.pop("consultar_id", None)
         st.rerun()
 
 # ════════════════════════════════════════════════════════════════════
@@ -215,21 +216,34 @@ if pagina == "🏠 Painel":
         for p in projetos:
             css = CARD_CLASS.get(p["status"], "")
             pct = (p["orcamento_consumido"] or 0) / (p["orcamento_aprovado"] or 1) * 100
-            st.markdown(f"""
-            <div class='card-projeto {css}'>
-              <b style='color:#111827;font-size:1rem'>{p['codigo']} — {p['nome']}</b>
-              &nbsp;&nbsp;<span style='color:#6B7280;font-size:0.85rem'>{p['area_demandante'] or '—'}</span>
-              <br>
-              <span style='color:#374151;font-size:0.84rem'>
-                PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
-                {p['status']} &nbsp;|&nbsp;
-                Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
-                Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
-                Orç. Consumido: <b>{pct:.0f}%</b> &nbsp;|&nbsp;
-                Forecast: {p['forecast_prazo'] or '—'}
-              </span>
-            </div>
-            """, unsafe_allow_html=True)
+            col_card, col_btn = st.columns([9, 1])
+            with col_card:
+                st.markdown(f"""
+                <div class='card-projeto {css}'>
+                  <b style='color:#111827;font-size:1rem'>{p['codigo']} — {p['nome']}</b>
+                  &nbsp;&nbsp;<span style='color:#6B7280;font-size:0.85rem'>{p['area_demandante'] or '—'}</span>
+                  <br>
+                  <span style='color:#374151;font-size:0.84rem'>
+                    PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
+                    {p['status']} &nbsp;|&nbsp;
+                    Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
+                    Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
+                    Orç. Consumido: <b>{pct:.0f}%</b> &nbsp;|&nbsp;
+                    Forecast: {p['forecast_prazo'] or '—'}
+                  </span>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_btn:
+                st.markdown("<div style='padding-top:6px'>", unsafe_allow_html=True)
+                if st.button("👁️", key=f"vp_{p['id']}", help="Consultar projeto"):
+                    st.session_state["consultar_id"] = p["id"]
+                    st.session_state.pop("editar_id", None)
+                    st.rerun()
+                if st.button("✏️", key=f"ep_{p['id']}", help="Editar projeto"):
+                    st.session_state["editar_id"] = p["id"]
+                    st.session_state.pop("consultar_id", None)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════
 # LISTA DE PROJETOS
@@ -278,10 +292,16 @@ elif pagina == "📋 Projetos":
                 </div>
                 """, unsafe_allow_html=True)
 
-                col_e, col_x, _ = st.columns([1, 1, 8])
+                col_c, col_e, col_x, _ = st.columns([1.2, 1.2, 1.2, 6])
+                with col_c:
+                    if st.button("👁️ Consultar", key=f"vl_{p['id']}"):
+                        st.session_state["consultar_id"] = p["id"]
+                        st.session_state.pop("editar_id", None)
+                        st.rerun()
                 with col_e:
                     if st.button("✏️ Editar", key=f"ed_{p['id']}"):
                         st.session_state["editar_id"] = p["id"]
+                        st.session_state.pop("consultar_id", None)
                         st.rerun()
                 with col_x:
                     if st.button("🗑️ Excluir", key=f"ex_{p['id']}"):
@@ -301,6 +321,178 @@ elif pagina == "📋 Projetos":
                         if st.button("❌ Cancelar", key=f"nao_{p['id']}"):
                             st.session_state.pop(f"confirmar_{p['id']}", None)
                             st.rerun()
+
+# ════════════════════════════════════════════════════════════════════
+# CONSULTAR PROJETO (somente leitura)
+# ════════════════════════════════════════════════════════════════════
+elif st.session_state.get("consultar_id"):
+    pid = st.session_state["consultar_id"]
+    p   = buscar_projeto(pid)
+
+    if not p:
+        st.error("Projeto não encontrado.")
+        st.session_state.pop("consultar_id", None)
+        st.rerun()
+
+    css   = CARD_CLASS.get(p["status"], "")
+    cor_s = {"🟢 No Prazo":"#009A44","🟡 Atenção":"#D97706",
+              "🔴 Crítico":"#DC2626","🔵 Não Iniciado":"#0056A2",
+              "⚫ Encerrado":"#6B7280"}.get(p["status"], "#6B7280")
+
+    # Cabeçalho
+    cb1, cb2 = st.columns([8, 2])
+    with cb1:
+        st.markdown(f'<div class="titulo-sistema">{p["codigo"]} — {p["nome"]}</div>',
+                    unsafe_allow_html=True)
+        st.markdown(f'<div class="subtitulo">{p["area_demandante"] or ""} · {p["categoria"] or ""}</div>',
+                    unsafe_allow_html=True)
+    with cb2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("✏️ Editar este projeto", use_container_width=True, type="primary"):
+            st.session_state["editar_id"] = pid
+            st.session_state.pop("consultar_id", None)
+            st.rerun()
+        if st.button("← Voltar", use_container_width=True):
+            st.session_state.pop("consultar_id", None)
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Status / badges
+    st.markdown(f"""
+    <div style='display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;'>
+      <span style='background:{cor_s}22; color:{cor_s}; padding:5px 14px;
+                   border-radius:99px; font-weight:700; font-size:0.88rem;'>{p['status']}</span>
+      <span style='background:#E5E7EB; color:#374151; padding:5px 14px;
+                   border-radius:99px; font-size:0.88rem;'>Fase: {p['fase'] or '—'}</span>
+      <span style='background:#E5E7EB; color:#374151; padding:5px 14px;
+                   border-radius:99px; font-size:0.88rem;'>Prioridade: {p['prioridade'] or '—'}</span>
+      <span style='background:#E5E7EB; color:#374151; padding:5px 14px;
+                   border-radius:99px; font-size:0.88rem;'>Categoria: {p.get('categoria') or '—'}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Detalhes em duas colunas
+    d1, d2 = st.columns(2)
+    def campo(label, valor):
+        return f"<div style='margin-bottom:10px;'><span style='font-size:0.75rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.5px'>{label}</span><br><span style='font-size:0.95rem;color:#111827;font-weight:600'>{valor or '—'}</span></div>"
+
+    with d1:
+        st.markdown(f"""
+        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
+          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Equipe</div>
+          {campo("PMO Responsável", p['pmo_responsavel'])}
+          {campo("Área Demandante", p['area_demandante'])}
+          {campo("Envolvidos", p['envolvidos'])}
+        </div>
+        <br>
+        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
+          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Cronograma</div>
+          {campo("Início Previsto", p['inicio_previsto'])}
+          {campo("Fim Previsto", p['fim_previsto'])}
+          {campo("Forecast de Conclusão", p['forecast_prazo'])}
+        </div>
+        """, unsafe_allow_html=True)
+
+    with d2:
+        orc_ap   = p['orcamento_aprovado']  or 0
+        orc_cons = p['orcamento_consumido'] or 0
+        fc_custo = p['forecast_custo']      or 0
+        pct_orc  = min(int(orc_cons / orc_ap * 100) if orc_ap else 0, 100)
+        cor_orc  = "#DC2626" if fc_custo > orc_ap else "#009A44"
+        st.markdown(f"""
+        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
+          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Orçamento</div>
+          {campo("Aprovado", f"R$ {orc_ap:,.0f}".replace(",","."))}
+          {campo("Consumido", f"R$ {orc_cons:,.0f}".replace(",","."))}
+          {campo("Forecast Custo", f"R$ {fc_custo:,.0f}".replace(",","."))}
+          <div style='background:#E5E7EB;border-radius:99px;height:8px;margin-top:8px;'>
+            <div style='background:{cor_orc};width:{pct_orc}%;height:8px;border-radius:99px;'></div>
+          </div>
+          <div style='font-size:0.75rem;color:#6B7280;margin-top:4px;'>{pct_orc}% consumido</div>
+        </div>
+        <br>
+        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
+          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Replanejamentos</div>
+          {campo("Quantidade", p['qtd_replanejamentos'])}
+          {campo("Último Motivo", p['motivo_replanejamento'])}
+        </div>
+        """, unsafe_allow_html=True)
+
+    if p.get("descricao"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
+          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px'>Descrição</div>
+          <p style='color:#374151;margin:0'>{p['descricao']}</p>
+        </div>""", unsafe_allow_html=True)
+
+    if p.get("observacoes"):
+        st.markdown(f"""
+        <div style='background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:16px 20px;margin-top:10px;'>
+          <div style='font-size:0.8rem;font-weight:700;color:#D97706;margin-bottom:6px;'>Observações</div>
+          <p style='color:#374151;margin:0'>{p['observacoes']}</p>
+        </div>""", unsafe_allow_html=True)
+
+    # Tarefas (leitura)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<hr style='border-color:#E5E7EB'>", unsafe_allow_html=True)
+    st.markdown("#### ✅ Tarefas")
+    met = metricas_tarefas(pid)
+    if met["total"] > 0:
+        pct_t = met["pct"]
+        cor_t = "#009A44" if pct_t == 100 else ("#0056A2" if pct_t >= 50 else "#D97706")
+        st.markdown(f"""
+        <div style='background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:14px 20px;margin-bottom:14px;'>
+          <div style='display:flex;justify-content:space-between;margin-bottom:6px;'>
+            <span style='font-size:0.85rem;color:#374151'><b>{met['concluidas']}</b> de <b>{met['total']}</b> concluídas</span>
+            <span style='font-weight:700;color:{cor_t}'>{pct_t}%</span>
+          </div>
+          <div style='background:#E5E7EB;border-radius:99px;height:8px;'>
+            <div style='background:{cor_t};width:{pct_t}%;height:8px;border-radius:99px;'></div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+        for t in listar_tarefas(pid):
+            cor_s2 = TAREFA_CORES.get(t["status"], "#6B7280")
+            cor_p2 = TAREFA_PRIOR_CORES.get(t["prioridade"], "#6B7280")
+            st.markdown(f"""
+            <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;
+                        padding:10px 16px;margin-bottom:6px;border-left:3px solid {cor_p2};'>
+              <div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap;'>
+                <span style='font-weight:600;color:#111827'>{t['titulo']}</span>
+                <span style='background:{cor_s2}22;color:{cor_s2};font-size:0.72rem;font-weight:600;padding:2px 8px;border-radius:99px;'>{t['status']}</span>
+                <span style='background:{cor_p2}22;color:{cor_p2};font-size:0.72rem;font-weight:600;padding:2px 8px;border-radius:99px;'>{t['prioridade']}</span>
+              </div>
+              <div style='font-size:0.78rem;color:#6B7280;margin-top:4px;'>
+                {'👤 ' + t['responsavel'] if t['responsavel'] else ''}&nbsp;&nbsp;
+                {'📅 ' + t['data_prevista'] if t['data_prevista'] else ''}
+              </div>
+            </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("<span style='color:#9CA3AF;font-size:0.88rem'>Nenhuma tarefa cadastrada.</span>",
+                    unsafe_allow_html=True)
+
+    # Documentos (leitura + download)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<hr style='border-color:#E5E7EB'>", unsafe_allow_html=True)
+    st.markdown("#### 📎 Documentos")
+    docs = listar_documentos(pid)
+    if docs:
+        for doc in docs:
+            dc1, dc2 = st.columns([6, 1])
+            with dc1:
+                st.markdown(f"📄 **{doc['nome_arquivo']}** <span style='color:#9CA3AF;font-size:0.8rem'>&nbsp;·&nbsp; {doc['enviado_por']} · {doc['enviado_em'][:10]}</span>",
+                            unsafe_allow_html=True)
+            with dc2:
+                raw = baixar_documento(doc["id"])
+                if raw:
+                    st.download_button("⬇️", data=raw["conteudo"],
+                                       file_name=raw["nome_arquivo"],
+                                       mime=raw["tipo_arquivo"] or "application/octet-stream",
+                                       key=f"dlc_{doc['id']}")
+    else:
+        st.markdown("<span style='color:#9CA3AF;font-size:0.88rem'>Nenhum documento anexado.</span>",
+                    unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════
 # FORMULÁRIO NOVO / EDITAR
