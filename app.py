@@ -16,41 +16,52 @@ init_db()
 # ── Estilos ──────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  .main { background:#0E1117; }
-  .block-container { padding-top:1rem; }
+  /* Fundo geral */
+  .stApp, .main, [data-testid="stAppViewContainer"] {
+    background: #F0F2F6 !important;
+  }
+  [data-testid="stSidebar"] {
+    background: #FFFFFF !important;
+    border-right: 1px solid #E5E7EB !important;
+  }
+  .block-container { padding-top:1.5rem; }
+
+  /* Títulos */
   .titulo-sistema {
-    font-size:1.6rem; font-weight:700; color:#FFFFFF;
-    border-left:5px solid #009A44; padding-left:12px; margin-bottom:4px;
+    font-size:1.5rem; font-weight:700; color:#111827;
+    border-left:4px solid #0056A2; padding-left:12px; margin-bottom:2px;
   }
-  .subtitulo { font-size:0.9rem; color:#AAAAAA; padding-left:17px; }
+  .subtitulo { font-size:0.88rem; color:#6B7280; padding-left:16px; }
+
+  /* Cards de projeto */
   .card-projeto {
-    background:#1C2333; border-radius:10px;
-    padding:16px 20px; margin-bottom:12px;
-    border-left:5px solid #555;
+    background:#FFFFFF;
+    border-radius:10px;
+    padding:16px 20px;
+    margin-bottom:10px;
+    border-left:4px solid #D1D5DB;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07);
   }
-  .card-verde   { border-left-color:#009A44; }
-  .card-amarelo { border-left-color:#FFC200; }
-  .card-vermelho{ border-left-color:#C0392B; }
-  .card-azul    { border-left-color:#0056A2; }
-  .badge {
-    display:inline-block; padding:3px 10px; border-radius:12px;
-    font-size:0.78rem; font-weight:600; margin-right:6px;
+  .card-verde    { border-left-color:#009A44; }
+  .card-amarelo  { border-left-color:#F59E0B; }
+  .card-vermelho { border-left-color:#DC2626; }
+  .card-azul     { border-left-color:#0056A2; }
+
+  /* KPI */
+  .kpi {
+    background:#FFFFFF; border-radius:10px;
+    padding:16px 12px; text-align:center;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07);
   }
-  .kpi { background:#1C2333; border-radius:8px; padding:14px; text-align:center; }
-  .kpi-val { font-size:1.8rem; font-weight:700; }
-  .kpi-lbl { font-size:0.78rem; color:#AAAAAA; }
-  .divider { border-top:1px solid #333; margin:16px 0; }
-  .logo-cateno {
-    background: linear-gradient(135deg, #002B5C 0%, #0056A2 100%);
-    border-radius:10px; padding:10px 20px;
-    display:flex; align-items:center; gap:12px; margin-bottom:16px;
-  }
-  .logo-texto {
-    font-size:1.6rem; font-weight:800; color:#FFFFFF; letter-spacing:2px;
-  }
-  .logo-sub {
-    font-size:0.75rem; color:#AAD4FF; letter-spacing:1px;
-  }
+  .kpi-val { font-size:1.9rem; font-weight:700; color:#111827; }
+  .kpi-lbl { font-size:0.75rem; color:#6B7280; margin-top:2px; }
+
+  /* Divider */
+  .divider { border-top:1px solid #E5E7EB; margin:16px 0; }
+
+  /* Texto geral dos cards */
+  .card-projeto b { color:#111827; }
+  .card-projeto span { color:#374151; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -78,14 +89,14 @@ if not st.session_state.usuario:
     col_center = st.columns([1,1.2,1])[1]
     with col_center:
         st.markdown("""
-        <div style='text-align:center; padding:40px 30px; background:#1C2333;
-                    border-radius:16px; border:1px solid #333;'>
+        <div style='text-align:center; padding:40px 30px; background:#FFFFFF;
+                    border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.10);'>
           <div style='background:linear-gradient(135deg,#002B5C,#0056A2);
-                      border-radius:8px; padding:12px 24px; display:inline-block; margin-bottom:16px;'>
+                      border-radius:8px; padding:12px 28px; display:inline-block; margin-bottom:16px;'>
             <span style='font-size:1.8rem; font-weight:800; color:#FFF; letter-spacing:3px;'>CATENO</span>
           </div>
-          <div style='font-size:1.3rem; font-weight:700; color:#FFF; margin:8px 0'>Sistema PMO</div>
-          <div style='color:#AAA; font-size:0.9rem'>Controle de Projetos e Documentações</div>
+          <div style='font-size:1.3rem; font-weight:700; color:#111827; margin:8px 0'>Sistema PMO</div>
+          <div style='color:#6B7280; font-size:0.9rem'>Controle de Projetos e Documentações</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -99,7 +110,7 @@ if not st.session_state.usuario:
             else:
                 st.error("E-mail ou senha incorretos.")
         st.markdown("""
-        <div style='text-align:center; color:#666; font-size:0.78rem; margin-top:16px'>
+        <div style='text-align:center; color:#9CA3AF; font-size:0.78rem; margin-top:16px'>
         Acesso restrito à equipe PMO
         </div>""", unsafe_allow_html=True)
     st.stop()
@@ -117,17 +128,17 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown(f"""
-    <div style='background:#1C2333; border-radius:10px; padding:14px; margin-bottom:16px;'>
-      <div style='font-size:0.78rem; color:#AAA'>Logado como</div>
-      <div style='font-weight:700; color:#FFF'>{st.session_state.usuario['nome']}</div>
-      <div style='font-size:0.78rem; color:#009A44'>{st.session_state.usuario['email']}</div>
+    <div style='background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:12px 14px; margin-bottom:16px;'>
+      <div style='font-size:0.75rem; color:#9CA3AF'>Logado como</div>
+      <div style='font-weight:700; color:#111827'>{st.session_state.usuario['nome']}</div>
+      <div style='font-size:0.75rem; color:#0056A2'>{st.session_state.usuario['email']}</div>
     </div>
     """, unsafe_allow_html=True)
 
     pagina = st.radio("Menu", ["🏠 Painel", "📋 Projetos", "➕ Novo Projeto", "🔑 Trocar Senha"],
                       label_visibility="collapsed")
 
-    st.markdown("<hr style='border-color:#333'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border-color:#E5E7EB'>", unsafe_allow_html=True)
     if st.button("Sair", use_container_width=True):
         st.session_state.usuario = None
         st.session_state.pop("editar_id", None)
@@ -164,15 +175,15 @@ if pagina == "🏠 Painel":
               <div class='kpi-lbl'>{label}</div>
             </div>""", unsafe_allow_html=True)
 
-        kpi(k1, "Total",        total)
+        kpi(k1, "Total",        total,     "#111827")
         kpi(k2, "🟢 No Prazo",  no_prazo,  "#009A44")
-        kpi(k3, "🟡 Atenção",   atencao,   "#FFC200")
-        kpi(k4, "🔴 Crítico",   critico,   "#C0392B")
+        kpi(k3, "🟡 Atenção",   atencao,   "#D97706")
+        kpi(k4, "🔴 Crítico",   critico,   "#DC2626")
         kpi(k5, "🔵 Não Inic.", nao_inic,  "#0056A2")
-        kpi(k6, "Consumido",    f"R${cons_tot/1e6:.1f}M", "#7EB8F7")
+        kpi(k6, "Consumido",    f"R${cons_tot/1e6:.1f}M", "#374151")
         kpi(k7, "Forecast",
             f"R${fc_tot/1e6:.1f}M",
-            "#C0392B" if fc_tot > orc_tot else "#009A44")
+            "#DC2626" if fc_tot > orc_tot else "#009A44")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -191,10 +202,10 @@ if pagina == "🏠 Painel":
             pct = (p["orcamento_consumido"] or 0) / (p["orcamento_aprovado"] or 1) * 100
             st.markdown(f"""
             <div class='card-projeto {css}'>
-              <b>{p['codigo']} — {p['nome']}</b>
-              &nbsp;&nbsp;<span style='color:#AAA;font-size:0.85rem'>{p['area_demandante'] or '—'}</span>
+              <b style='color:#111827;font-size:1rem'>{p['codigo']} — {p['nome']}</b>
+              &nbsp;&nbsp;<span style='color:#6B7280;font-size:0.85rem'>{p['area_demandante'] or '—'}</span>
               <br>
-              <span style='color:#CCC;font-size:0.85rem'>
+              <span style='color:#374151;font-size:0.84rem'>
                 PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
                 {p['status']} &nbsp;|&nbsp;
                 Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
@@ -238,12 +249,12 @@ elif pagina == "📋 Projetos":
             with st.container():
                 st.markdown(f"""
                 <div class='card-projeto {css}'>
-                  <b>{p['codigo']} — {p['nome']}</b>
-                  <span style='color:#AAA; font-size:0.85rem; margin-left:10px'>
+                  <b style='color:#111827;font-size:1rem'>{p['codigo']} — {p['nome']}</b>
+                  <span style='color:#6B7280; font-size:0.85rem; margin-left:10px'>
                     {p['area_demandante'] or '—'}
                   </span><br>
-                  <span style='color:#CCC; font-size:0.85rem'>
-                    {p['status']} &nbsp;|&nbsp; PMO: {p['pmo_responsavel'] or '—'} &nbsp;|&nbsp;
+                  <span style='color:#374151; font-size:0.84rem'>
+                    {p['status']} &nbsp;|&nbsp; PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
                     Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
                     Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
                     Prazo: {p['fim_previsto'] or '—'} → {p['forecast_prazo'] or '—'} &nbsp;|&nbsp;
@@ -420,7 +431,7 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
                         excluir_documento(doc["id"])
                         st.rerun()
         else:
-            st.markdown("<span style='color:#777;font-size:0.88rem'>Nenhum documento anexado ainda.</span>",
+            st.markdown("<span style='color:#9CA3AF;font-size:0.88rem'>Nenhum documento anexado ainda.</span>",
                         unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -454,10 +465,10 @@ elif pagina == "🔑 Trocar Senha":
     with col:
         with st.form("form_senha"):
             st.markdown(f"""
-            <div style='background:#1C2333; border-radius:10px; padding:16px;
+            <div style='background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:16px;
                         margin-bottom:16px; text-align:center;'>
-              <div style='color:#AAA; font-size:0.85rem;'>Alterando senha para</div>
-              <div style='color:#FFF; font-weight:700;'>{st.session_state.usuario['nome']}</div>
+              <div style='color:#6B7280; font-size:0.85rem;'>Alterando senha para</div>
+              <div style='color:#111827; font-weight:700;'>{st.session_state.usuario['nome']}</div>
             </div>
             """, unsafe_allow_html=True)
 
