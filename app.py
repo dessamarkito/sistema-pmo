@@ -3,7 +3,9 @@ from database import (init_db, autenticar, listar_projetos, buscar_projeto,
                       salvar_projeto, excluir_projeto, areas_distintas,
                       pmos_distintos, trocar_senha,
                       salvar_documento, listar_documentos,
-                      baixar_documento, excluir_documento)
+                      baixar_documento, excluir_documento,
+                      listar_tarefas, salvar_tarefa, buscar_tarefa,
+                      excluir_tarefa, metricas_tarefas)
 
 st.set_page_config(
     page_title="Sistema PMO | Cateno",
@@ -69,6 +71,10 @@ STATUS_OPTS    = ["🔵 Não Iniciado","🟢 No Prazo","🟡 Atenção","🔴 Cr
 PRIORIDADE_OPTS = ["Alta","Média","Baixa"]
 FASE_OPTS      = ["Iniciação","Planejamento","Execução","Monitoramento","Encerramento"]
 CATEGORIA_OPTS = ["Estratégicos","Regulatórios","Operacionais","Melhorias"]
+TAREFA_STATUS  = ["Pendente","Em Andamento","Concluída","Cancelada"]
+TAREFA_CORES   = {"Pendente":"#6B7280","Em Andamento":"#0056A2",
+                  "Concluída":"#009A44","Cancelada":"#9CA3AF"}
+TAREFA_PRIOR_CORES = {"Alta":"#DC2626","Média":"#D97706","Baixa":"#6B7280"}
 
 CARD_CLASS = {
     "🟢 No Prazo":    "card-verde",
@@ -451,6 +457,152 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
                 )
                 st.success(f"✅ **{arquivo.name}** enviado com sucesso!")
                 st.rerun()
+
+    # ── Seção de Tarefas ──────────────────────────────────────────────
+    if editar_id:
+        st.markdown("<hr style='border-color:#E5E7EB; margin:28px 0'>", unsafe_allow_html=True)
+        st.markdown("#### ✅ Tarefas Planejadas")
+
+        met = metricas_tarefas(editar_id)
+        tarefas = listar_tarefas(editar_id)
+
+        # Mini painel de progresso
+        if met["total"] > 0:
+            pct = met["pct"]
+            bar_color = "#009A44" if pct == 100 else ("#0056A2" if pct >= 50 else "#D97706")
+            st.markdown(f"""
+            <div style='background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px;
+                        padding:14px 20px; margin-bottom:16px;'>
+              <div style='display:flex; justify-content:space-between; margin-bottom:6px;'>
+                <span style='font-size:0.85rem; color:#374151'>
+                  <b>{met['concluidas']}</b> de <b>{met['total']}</b> tarefas concluídas
+                </span>
+                <span style='font-size:0.85rem; font-weight:700; color:{bar_color}'>{pct}%</span>
+              </div>
+              <div style='background:#E5E7EB; border-radius:99px; height:8px;'>
+                <div style='background:{bar_color}; width:{pct}%; height:8px; border-radius:99px;
+                            transition:width 0.3s;'></div>
+              </div>
+              <div style='display:flex; gap:16px; margin-top:10px; font-size:0.78rem; color:#6B7280;'>
+                <span>🔵 Em andamento: <b>{met['em_andamento']}</b></span>
+                <span>⏳ Pendentes: <b>{met['pendentes']}</b></span>
+                <span>✅ Concluídas: <b>{met['concluidas']}</b></span>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Lista de tarefas
+        if tarefas:
+            for t in tarefas:
+                cor_status = TAREFA_CORES.get(t["status"], "#6B7280")
+                cor_prior  = TAREFA_PRIOR_CORES.get(t["prioridade"], "#6B7280")
+                is_edit = st.session_state.get(f"edit_tarefa_{t['id']}", False)
+
+                with st.container():
+                    if is_edit:
+                        # Formulário inline de edição
+                        with st.form(f"form_edit_t_{t['id']}"):
+                            st.markdown(f"**Editando:** {t['titulo']}")
+                            ea, eb = st.columns(2)
+                            with ea:
+                                et = st.text_input("Título *", value=t["titulo"])
+                                er = st.text_input("Responsável", value=t["responsavel"] or "")
+                                ep = st.selectbox("Prioridade", PRIORIDADE_OPTS,
+                                                  index=PRIORIDADE_OPTS.index(t["prioridade"]) if t["prioridade"] in PRIORIDADE_OPTS else 1)
+                            with eb:
+                                es = st.selectbox("Status", TAREFA_STATUS,
+                                                  index=TAREFA_STATUS.index(t["status"]) if t["status"] in TAREFA_STATUS else 0)
+                                edp = st.text_input("Data Prevista (dd/mm/aaaa)", value=t["data_prevista"] or "")
+                                edc = st.text_input("Data Conclusão (dd/mm/aaaa)", value=t["data_conclusao"] or "")
+                            ed = st.text_area("Descrição", value=t["descricao"] or "", height=60)
+                            ec1, ec2 = st.columns(2)
+                            with ec1:
+                                if st.form_submit_button("💾 Salvar", type="primary", use_container_width=True):
+                                    salvar_tarefa({
+                                        "id": t["id"], "titulo": et, "descricao": ed,
+                                        "responsavel": er, "status": es, "prioridade": ep,
+                                        "data_prevista": edp, "data_conclusao": edc,
+                                    }, st.session_state.usuario["nome"])
+                                    st.session_state.pop(f"edit_tarefa_{t['id']}", None)
+                                    st.rerun()
+                            with ec2:
+                                if st.form_submit_button("Cancelar", use_container_width=True):
+                                    st.session_state.pop(f"edit_tarefa_{t['id']}", None)
+                                    st.rerun()
+                    else:
+                        col_info, col_ac = st.columns([9, 1])
+                        with col_info:
+                            st.markdown(f"""
+                            <div style='background:#FFFFFF; border:1px solid #E5E7EB; border-radius:8px;
+                                        padding:10px 16px; margin-bottom:6px;
+                                        border-left:3px solid {cor_prior};'>
+                              <div style='display:flex; align-items:center; gap:10px; flex-wrap:wrap;'>
+                                <span style='font-weight:600; color:#111827'>{t['titulo']}</span>
+                                <span style='background:{cor_status}22; color:{cor_status};
+                                             font-size:0.72rem; font-weight:600; padding:2px 8px;
+                                             border-radius:99px;'>{t['status']}</span>
+                                <span style='background:{cor_prior}22; color:{cor_prior};
+                                             font-size:0.72rem; font-weight:600; padding:2px 8px;
+                                             border-radius:99px;'>{t['prioridade']}</span>
+                              </div>
+                              <div style='font-size:0.78rem; color:#6B7280; margin-top:4px;'>
+                                {'👤 ' + t['responsavel'] if t['responsavel'] else ''}&nbsp;&nbsp;
+                                {'📅 ' + t['data_prevista'] if t['data_prevista'] else ''}
+                                {' → ✅ ' + t['data_conclusao'] if t['data_conclusao'] else ''}
+                              </div>
+                              {f"<div style='font-size:0.78rem; color:#9CA3AF; margin-top:2px;'>{t['descricao']}</div>" if t['descricao'] else ''}
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with col_ac:
+                            st.markdown("<div style='padding-top:4px'>", unsafe_allow_html=True)
+                            if st.button("✏️", key=f"edtk_{t['id']}", help="Editar tarefa"):
+                                st.session_state[f"edit_tarefa_{t['id']}"] = True
+                                st.rerun()
+                            if st.button("🗑️", key=f"deltk_{t['id']}", help="Excluir tarefa"):
+                                excluir_tarefa(t["id"])
+                                st.rerun()
+                            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<span style='color:#9CA3AF;font-size:0.88rem'>Nenhuma tarefa cadastrada ainda.</span>",
+                        unsafe_allow_html=True)
+
+        # Formulário de nova tarefa
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("➕ Nova Tarefa", type="primary"):
+            st.session_state["nova_tarefa_aberta"] = True
+
+        if st.session_state.get("nova_tarefa_aberta"):
+            with st.form("form_nova_tarefa", clear_on_submit=True):
+                st.markdown("**Nova Tarefa**")
+                na, nb = st.columns(2)
+                with na:
+                    nt = st.text_input("Título *")
+                    nr = st.text_input("Responsável")
+                    np = st.selectbox("Prioridade", PRIORIDADE_OPTS, index=1)
+                with nb:
+                    ns = st.selectbox("Status", TAREFA_STATUS)
+                    nd = st.text_input("Data Prevista (dd/mm/aaaa)")
+                    _ = st.text_input("Data Conclusão (dd/mm/aaaa)", value="",
+                                      disabled=True, help="Preenchida ao concluir")
+                ndesc = st.text_area("Descrição", height=60)
+                nc1, nc2 = st.columns(2)
+                with nc1:
+                    if st.form_submit_button("✅ Adicionar Tarefa", type="primary", use_container_width=True):
+                        if not nt:
+                            st.error("Informe o título da tarefa.")
+                        else:
+                            salvar_tarefa({
+                                "projeto_id": editar_id,
+                                "titulo": nt, "descricao": ndesc,
+                                "responsavel": nr, "status": ns,
+                                "prioridade": np, "data_prevista": nd,
+                            }, st.session_state.usuario["nome"])
+                            st.session_state.pop("nova_tarefa_aberta", None)
+                            st.rerun()
+                with nc2:
+                    if st.form_submit_button("Cancelar", use_container_width=True):
+                        st.session_state.pop("nova_tarefa_aberta", None)
+                        st.rerun()
 
 # ════════════════════════════════════════════════════════════════════
 # TROCAR SENHA
