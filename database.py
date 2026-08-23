@@ -115,6 +115,11 @@ def init_db():
     # Migrações para bancos existentes
     for sql in [
         "ALTER TABLE projetos ADD COLUMN categoria TEXT DEFAULT 'Operacionais'",
+        "ALTER TABLE projetos ADD COLUMN gerente_executivo TEXT",
+        "ALTER TABLE projetos ADD COLUMN direcionador_estrategico TEXT",
+        "ALTER TABLE projetos ADD COLUMN etapa TEXT DEFAULT 'Ideação'",
+        "ALTER TABLE projetos ADD COLUMN orcamento_previsto REAL DEFAULT 0",
+        "ALTER TABLE projetos ADD COLUMN obs_status TEXT",
     ]:
         try:
             c.execute(sql)
@@ -173,28 +178,28 @@ def salvar_projeto(dados, usuario):
     conn = get_conn()
     c = conn.cursor()
     if dados.get("id"):
-        # Verifica se o status mudou antes de atualizar
         c.execute("SELECT status FROM projetos WHERE id=?", (dados["id"],))
         row = c.fetchone()
         status_anterior = row["status"] if row else None
 
         c.execute("""
             UPDATE projetos SET
-                nome=?, categoria=?, area_demandante=?, pmo_responsavel=?, envolvidos=?,
-                descricao=?, status=?, prioridade=?, fase=?,
-                inicio_previsto=?, fim_previsto=?, forecast_prazo=?,
-                orcamento_aprovado=?, orcamento_consumido=?, forecast_custo=?,
-                qtd_replanejamentos=?, motivo_replanejamento=?, observacoes=?,
+                nome=?, categoria=?, area_demandante=?, pmo_responsavel=?,
+                gerente_executivo=?, envolvidos=?, descricao=?,
+                status=?, prioridade=?, etapa=?,
+                direcionador_estrategico=?, orcamento_previsto=?,
+                obs_status=?,
                 atualizado_em=datetime('now')
             WHERE id=?
         """, (
-            dados["nome"], dados["categoria"], dados["area_demandante"], dados["pmo_responsavel"],
-            dados["envolvidos"], dados["descricao"], dados["status"],
-            dados["prioridade"], dados["fase"], dados["inicio_previsto"],
-            dados["fim_previsto"], dados["forecast_prazo"],
-            dados["orcamento_aprovado"], dados["orcamento_consumido"],
-            dados["forecast_custo"], dados["qtd_replanejamentos"],
-            dados["motivo_replanejamento"], dados["observacoes"], dados["id"]
+            dados["nome"], dados["categoria"], dados["area_demandante"],
+            dados["pmo_responsavel"], dados.get("gerente_executivo",""),
+            dados["envolvidos"], dados["descricao"],
+            dados["status"], dados["prioridade"], dados["etapa"],
+            dados.get("direcionador_estrategico",""),
+            dados.get("orcamento_previsto", 0),
+            dados.get("obs_status",""),
+            dados["id"]
         ))
 
         if status_anterior != dados["status"]:
@@ -204,29 +209,25 @@ def salvar_projeto(dados, usuario):
                 VALUES (?,?,?,?,?)
             """, (dados["id"], status_anterior, dados["status"],
                   dados.get("obs_status", ""), usuario))
-
         new_id = None
     else:
         codigo = proximo_codigo()
         c.execute("""
             INSERT INTO projetos (
-                codigo, nome, categoria, area_demandante, pmo_responsavel, envolvidos,
-                descricao, status, prioridade, fase,
-                inicio_previsto, fim_previsto, forecast_prazo,
-                orcamento_aprovado, orcamento_consumido, forecast_custo,
-                qtd_replanejamentos, motivo_replanejamento, observacoes, criado_por
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                codigo, nome, categoria, area_demandante, pmo_responsavel,
+                gerente_executivo, envolvidos, descricao,
+                status, prioridade, etapa,
+                direcionador_estrategico, orcamento_previsto, criado_por
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
-            codigo, dados["nome"], dados["categoria"], dados["area_demandante"], dados["pmo_responsavel"],
-            dados["envolvidos"], dados["descricao"], dados["status"],
-            dados["prioridade"], dados["fase"], dados["inicio_previsto"],
-            dados["fim_previsto"], dados["forecast_prazo"],
-            dados["orcamento_aprovado"], dados["orcamento_consumido"],
-            dados["forecast_custo"], dados["qtd_replanejamentos"],
-            dados["motivo_replanejamento"], dados["observacoes"], usuario
+            codigo, dados["nome"], dados["categoria"], dados["area_demandante"],
+            dados["pmo_responsavel"], dados.get("gerente_executivo",""),
+            dados["envolvidos"], dados["descricao"],
+            dados["status"], dados["prioridade"], dados["etapa"],
+            dados.get("direcionador_estrategico",""),
+            dados.get("orcamento_previsto", 0), usuario
         ))
         new_id = c.lastrowid
-        # Grava o status inicial no histórico
         c.execute("""
             INSERT INTO historico_status
                 (projeto_id, status_anterior, status_novo, observacao, alterado_por)

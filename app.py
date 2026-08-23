@@ -78,8 +78,8 @@ st.markdown("""
 
 STATUS_OPTS    = ["🔵 Não Iniciado","🟢 No Prazo","🟡 Atenção","🔴 Crítico","⚫ Encerrado"]
 PRIORIDADE_OPTS = ["Alta","Média","Baixa"]
-FASE_OPTS      = ["Iniciação","Planejamento","Execução","Monitoramento","Encerramento"]
 CATEGORIA_OPTS = ["Estratégicos","Regulatórios","Operacionais","Melhorias"]
+ETAPA_OPTS     = ["Ideação","Prototipação","Aprovação do Business Case"]
 TAREFA_STATUS  = ["Pendente","Em Andamento","Concluída","Cancelada"]
 TAREFA_CORES   = {"Pendente":"#6B7280","Em Andamento":"#0056A2",
                   "Concluída":"#009A44","Cancelada":"#9CA3AF"}
@@ -254,7 +254,6 @@ if pagina == "🏠 Painel":
         st.markdown("#### Todos os Projetos")
         for p in projetos:
             css = CARD_CLASS.get(p["status"], "")
-            pct = (p["orcamento_consumido"] or 0) / (p["orcamento_aprovado"] or 1) * 100
             col_card, col_btn = st.columns([9, 1])
             with col_card:
                 st.markdown(f"""
@@ -265,10 +264,9 @@ if pagina == "🏠 Painel":
                   <span style='color:#374151;font-size:0.84rem'>
                     PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
                     {p['status']} &nbsp;|&nbsp;
-                    Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
+                    Etapa: {p.get('etapa') or '—'} &nbsp;|&nbsp;
                     Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
-                    Orç. Consumido: <b>{pct:.0f}%</b> &nbsp;|&nbsp;
-                    Forecast: {p['forecast_prazo'] or '—'}
+                    Orç. Previsto: <b>R$ {(p.get('orcamento_previsto') or 0):,.0f}</b>
                   </span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -323,10 +321,9 @@ elif pagina == "📋 Projetos":
                   </span><br>
                   <span style='color:#374151; font-size:0.84rem'>
                     {p['status']} &nbsp;|&nbsp; PMO: <b>{p['pmo_responsavel'] or '—'}</b> &nbsp;|&nbsp;
-                    Fase: {p['fase'] or '—'} &nbsp;|&nbsp;
+                    Etapa: {p.get('etapa') or '—'} &nbsp;|&nbsp;
                     Categoria: <b>{p.get('categoria') or '—'}</b> &nbsp;|&nbsp;
-                    Prazo: {p['fim_previsto'] or '—'} → {p['forecast_prazo'] or '—'} &nbsp;|&nbsp;
-                    Replanej.: {p['qtd_replanejamentos']}
+                    Orç. Previsto: <b>R$ {(p.get('orcamento_previsto') or 0):,.0f}</b>
                   </span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -398,12 +395,13 @@ elif st.session_state.get("consultar_id"):
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Status / badges
+    _etapa_c = p.get("etapa") or "—"
     st.markdown(f"""
     <div style='display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;'>
       <span style='background:{cor_s}22; color:{cor_s}; padding:5px 14px;
                    border-radius:99px; font-weight:700; font-size:0.88rem;'>{p['status']}</span>
       <span style='background:#E5E7EB; color:#374151; padding:5px 14px;
-                   border-radius:99px; font-size:0.88rem;'>Fase: {p['fase'] or '—'}</span>
+                   border-radius:99px; font-size:0.88rem;'>Etapa: {_etapa_c}</span>
       <span style='background:#E5E7EB; color:#374151; padding:5px 14px;
                    border-radius:99px; font-size:0.88rem;'>Prioridade: {p['prioridade'] or '—'}</span>
       <span style='background:#E5E7EB; color:#374151; padding:5px 14px;
@@ -421,40 +419,20 @@ elif st.session_state.get("consultar_id"):
         <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
           <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Equipe</div>
           {campo("PMO Responsável", p['pmo_responsavel'])}
+          {campo("Gerente Executivo", p.get('gerente_executivo'))}
           {campo("Área Demandante", p['area_demandante'])}
           {campo("Envolvidos", p['envolvidos'])}
-        </div>
-        <br>
-        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
-          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Cronograma</div>
-          {campo("Início Previsto", p['inicio_previsto'])}
-          {campo("Fim Previsto", p['fim_previsto'])}
-          {campo("Forecast de Conclusão", p['forecast_prazo'])}
         </div>
         """, unsafe_allow_html=True)
 
     with d2:
-        orc_ap   = p['orcamento_aprovado']  or 0
-        orc_cons = p['orcamento_consumido'] or 0
-        fc_custo = p['forecast_custo']      or 0
-        pct_orc  = min(int(orc_cons / orc_ap * 100) if orc_ap else 0, 100)
-        cor_orc  = "#DC2626" if fc_custo > orc_ap else "#009A44"
+        orc_prev = p.get("orcamento_previsto") or 0
         st.markdown(f"""
         <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
-          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Orçamento</div>
-          {campo("Aprovado", f"R$ {orc_ap:,.0f}".replace(",","."))}
-          {campo("Consumido", f"R$ {orc_cons:,.0f}".replace(",","."))}
-          {campo("Forecast Custo", f"R$ {fc_custo:,.0f}".replace(",","."))}
-          <div style='background:#E5E7EB;border-radius:99px;height:8px;margin-top:8px;'>
-            <div style='background:{cor_orc};width:{pct_orc}%;height:8px;border-radius:99px;'></div>
-          </div>
-          <div style='font-size:0.75rem;color:#6B7280;margin-top:4px;'>{pct_orc}% consumido</div>
-        </div>
-        <br>
-        <div style='background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:20px;'>
-          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Replanejamentos</div>
-          {campo("Quantidade", p['qtd_replanejamentos'])}
-          {campo("Último Motivo", p['motivo_replanejamento'])}
+          <div style='font-size:0.8rem;font-weight:700;color:#6B7280;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px'>Orçamento e Estratégia</div>
+          {campo("Orçamento Previsto", f"R$ {orc_prev:,.2f}".replace(",","X").replace(".",",").replace("X","."))}
+          {campo("Direcionador Estratégico", p.get('direcionador_estrategico'))}
+          {campo("Etapa Atual", p.get('etapa'))}
         </div>
         """, unsafe_allow_html=True)
 
@@ -554,75 +532,62 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
 
     with st.form("form_projeto", clear_on_submit=False):
         st.markdown("#### Identificação")
-        c1, c2 = st.columns(2)
-        with c1:
+        f1, f2 = st.columns(2)
+        with f1:
             nome = st.text_input("Nome do Projeto *", value=p.get("nome",""))
-        with c2:
+        with f2:
             area = st.text_input("Área Demandante *", value=p.get("area_demandante",""))
 
-        c3, c4 = st.columns(2)
-        with c3:
-            pmo  = st.text_input("PMO Responsável *", value=p.get("pmo_responsavel",""))
-        with c4:
-            envolvidos = st.text_input("Envolvidos", value=p.get("envolvidos",""))
+        f3, f4 = st.columns(2)
+        with f3:
+            pmo = st.text_input("PMO Responsável *", value=p.get("pmo_responsavel",""))
+        with f4:
+            gerente = st.text_input("Gerente Executivo Responsável", value=p.get("gerente_executivo",""))
 
-        descricao = st.text_area("Descrição do Projeto", value=p.get("descricao",""), height=100)
+        envolvidos = st.text_input("Envolvidos", value=p.get("envolvidos",""),
+                                   placeholder="Nomes separados por vírgula")
+        descricao  = st.text_area("Descrição do Projeto", value=p.get("descricao",""), height=100)
 
-        st.markdown("#### Status e Classificação")
-        c5, c6, c7, c8 = st.columns(4)
-        with c5:
-            status = st.selectbox("Status Atual *", STATUS_OPTS,
-                                  index=STATUS_OPTS.index(p["status"]) if p.get("status") in STATUS_OPTS else 0)
-        with c6:
+        st.markdown("#### Classificação")
+        g1, g2, g3 = st.columns(3)
+        with g1:
+            _prior = p.get("prioridade","Média") or "Média"
             prioridade = st.selectbox("Prioridade", PRIORIDADE_OPTS,
-                                      index=PRIORIDADE_OPTS.index(p["prioridade"]) if p.get("prioridade") in PRIORIDADE_OPTS else 1)
-        with c7:
-            fase = st.selectbox("Fase Atual", FASE_OPTS,
-                                index=FASE_OPTS.index(p["fase"]) if p.get("fase") in FASE_OPTS else 0)
-        with c8:
-            _cat_default = p.get("categoria","Operacionais") or "Operacionais"
+                                      index=PRIORIDADE_OPTS.index(_prior) if _prior in PRIORIDADE_OPTS else 1)
+        with g2:
+            _cat = p.get("categoria","Operacionais") or "Operacionais"
             categoria = st.selectbox("Categoria", CATEGORIA_OPTS,
-                                     index=CATEGORIA_OPTS.index(_cat_default) if _cat_default in CATEGORIA_OPTS else 2)
+                                     index=CATEGORIA_OPTS.index(_cat) if _cat in CATEGORIA_OPTS else 2)
+        with g3:
+            _etapa = p.get("etapa","Ideação") or "Ideação"
+            etapa = st.selectbox("Etapa", ETAPA_OPTS,
+                                 index=ETAPA_OPTS.index(_etapa) if _etapa in ETAPA_OPTS else 0)
 
-        obs_status = st.text_input(
-            "Motivo da mudança de status (opcional)",
-            placeholder="Ex: Aprovação do sponsor recebida, dependência resolvida...",
-            help="Salvo no histórico somente quando o Status Atual for alterado."
-        )
-
-        st.markdown("#### Cronograma")
-        d1, d2, d3 = st.columns(3)
-        with d1:
-            inicio  = st.text_input("Início Previsto (dd/mm/aaaa)", value=p.get("inicio_previsto",""))
-        with d2:
-            fim     = st.text_input("Fim Previsto (dd/mm/aaaa)", value=p.get("fim_previsto",""))
-        with d3:
-            fc_prazo = st.text_input("Forecast de Conclusão (dd/mm/aaaa)", value=p.get("forecast_prazo",""))
+        direcionador = st.text_input("Direcionador Estratégico",
+                                     value=p.get("direcionador_estrategico",""),
+                                     placeholder="Ex: Transformação Digital, Eficiência Operacional...")
 
         st.markdown("#### Orçamento")
-        o1, o2, o3 = st.columns(3)
-        with o1:
-            orc_ap  = st.number_input("Orçamento Aprovado (R$)", min_value=0.0,
-                                      value=float(p.get("orcamento_aprovado") or 0), step=1000.0)
-        with o2:
-            orc_cons = st.number_input("Consumido (R$)", min_value=0.0,
-                                       value=float(p.get("orcamento_consumido") or 0), step=1000.0)
-        with o3:
-            fc_custo = st.number_input("Forecast Custo (R$)", min_value=0.0,
-                                       value=float(p.get("forecast_custo") or 0), step=1000.0)
+        orc_prev = st.number_input("Orçamento Previsto (R$)", min_value=0.0,
+                                   value=float(p.get("orcamento_previsto") or 0), step=1000.0,
+                                   format="%.2f")
 
-        st.markdown("#### Replanejamentos")
-        r1, r2 = st.columns([1, 3])
-        with r1:
-            qtd_rep = st.number_input("Qtd. Replanejamentos", min_value=0,
-                                      value=int(p.get("qtd_replanejamentos") or 0))
-        with r2:
-            motivo  = st.text_input("Motivo do Último Replanejamento", value=p.get("motivo_replanejamento",""))
-
-        observacoes = st.text_area("Observações", value=p.get("observacoes",""), height=80)
+        if editar_id:
+            st.markdown("#### Status Atual")
+            h1, h2 = st.columns([1, 2])
+            with h1:
+                _st = p.get("status","🔵 Não Iniciado") or "🔵 Não Iniciado"
+                status = st.selectbox("Status", STATUS_OPTS,
+                                      index=STATUS_OPTS.index(_st) if _st in STATUS_OPTS else 0)
+            with h2:
+                obs_status = st.text_input("Motivo da mudança (opcional)",
+                                           placeholder="Registrado no histórico ao mudar o status")
+        else:
+            status     = "🔵 Não Iniciado"
+            obs_status = ""
 
         st.markdown("<br>", unsafe_allow_html=True)
-        c_salvar, c_cancelar = st.columns([1,1])
+        c_salvar, c_cancelar = st.columns([1, 1])
         with c_salvar:
             salvar = st.form_submit_button("💾 Salvar Projeto", type="primary", use_container_width=True)
         with c_cancelar:
@@ -635,18 +600,12 @@ elif pagina == "➕ Novo Projeto" or st.session_state.get("editar_id"):
                 dados = {
                     "id": editar_id,
                     "nome": nome, "categoria": categoria,
-                    "area_demandante": area,
-                    "pmo_responsavel": pmo, "envolvidos": envolvidos,
+                    "area_demandante": area, "pmo_responsavel": pmo,
+                    "gerente_executivo": gerente, "envolvidos": envolvidos,
                     "descricao": descricao, "status": status,
-                    "prioridade": prioridade, "fase": fase,
-                    "inicio_previsto": inicio, "fim_previsto": fim,
-                    "forecast_prazo": fc_prazo,
-                    "orcamento_aprovado": orc_ap,
-                    "orcamento_consumido": orc_cons,
-                    "forecast_custo": fc_custo,
-                    "qtd_replanejamentos": qtd_rep,
-                    "motivo_replanejamento": motivo,
-                    "observacoes": observacoes,
+                    "prioridade": prioridade, "etapa": etapa,
+                    "direcionador_estrategico": direcionador,
+                    "orcamento_previsto": orc_prev,
                     "obs_status": obs_status,
                 }
                 novo_id = salvar_projeto(dados, st.session_state.usuario["nome"])
