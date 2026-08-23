@@ -99,6 +99,19 @@ def init_db():
         )
     """)
 
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS historico_status (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            projeto_id INTEGER NOT NULL,
+            status_anterior TEXT,
+            status_novo TEXT NOT NULL,
+            observacao TEXT,
+            alterado_por TEXT,
+            alterado_em TEXT DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (projeto_id) REFERENCES projetos(id)
+        )
+    """)
+
     # Migrações para bancos existentes
     for sql in [
         "ALTER TABLE projetos ADD COLUMN categoria TEXT DEFAULT 'Operacionais'",
@@ -160,6 +173,11 @@ def salvar_projeto(dados, usuario):
     conn = get_conn()
     c = conn.cursor()
     if dados.get("id"):
+        # Verifica se o status mudou antes de atualizar
+        c.execute("SELECT status FROM projetos WHERE id=?", (dados["id"],))
+        row = c.fetchone()
+        status_anterior = row["status"] if row else None
+
         c.execute("""
             UPDATE projetos SET
                 nome=?, categoria=?, area_demandante=?, pmo_responsavel=?, envolvidos=?,
@@ -178,6 +196,16 @@ def salvar_projeto(dados, usuario):
             dados["forecast_custo"], dados["qtd_replanejamentos"],
             dados["motivo_replanejamento"], dados["observacoes"], dados["id"]
         ))
+
+        if status_anterior != dados["status"]:
+            c.execute("""
+                INSERT INTO historico_status
+                    (projeto_id, status_anterior, status_novo, observacao, alterado_por)
+                VALUES (?,?,?,?,?)
+            """, (dados["id"], status_anterior, dados["status"],
+                  dados.get("obs_status", ""), usuario))
+
+        new_id = None
     else:
         codigo = proximo_codigo()
         c.execute("""
@@ -197,10 +225,28 @@ def salvar_projeto(dados, usuario):
             dados["forecast_custo"], dados["qtd_replanejamentos"],
             dados["motivo_replanejamento"], dados["observacoes"], usuario
         ))
-    new_id = c.lastrowid if not dados.get("id") else None
+        new_id = c.lastrowid
+        # Grava o status inicial no histórico
+        c.execute("""
+            INSERT INTO historico_status
+                (projeto_id, status_anterior, status_novo, observacao, alterado_por)
+            VALUES (?,?,?,?,?)
+        """, (new_id, None, dados["status"], "Projeto criado", usuario))
+
     conn.commit()
     conn.close()
     return new_id
+
+def listar_historico_status(projeto_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM historico_status
+        WHERE projeto_id=? ORDER BY alterado_em DESC
+    """, (projeto_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
 
 def salvar_documento(projeto_id, nome_arquivo, tipo_arquivo, conteudo, enviado_por):
     conn = get_conn()
